@@ -87,7 +87,9 @@ hr{border:0;border-top:1px solid #eee;margin:14px 0}
 <div id="history" class="muted">No orders yet.</div>
 </div>
 </main>
-
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
 <script>
 let products=JSON.parse(localStorage.getItem("anyme_products")||"[]");
 let cart={};
