@@ -1,1 +1,162 @@
 
+<!DOCTYPE html>
+<html lang="my">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ANYME POS</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#f5f3ef;color:#252522;font-family:Arial,sans-serif}
+header{background:#20231f;color:white;padding:22px}
+header h1{margin:0;font-size:25px;letter-spacing:3px}
+header p{margin:6px 0 0;color:#d4c9b8;font-size:13px}
+main{padding:16px;max-width:700px;margin:auto}
+.card{background:white;border-radius:14px;padding:16px;margin:12px 0;box-shadow:0 3px 14px #0000000b}
+h2{font-size:17px;margin:0 0 14px}
+input,select{width:100%;padding:12px;border:1px solid #ddd;border-radius:9px;margin:5px 0 12px;font-size:15px;background:white}
+button{border:0;border-radius:9px;padding:12px 15px;background:#292e28;color:white;font-size:14px;cursor:pointer}
+button.secondary{background:#e9e6df;color:#292e28}
+button:disabled{opacity:.4}
+.row{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.product{border:1px solid #eee;padding:12px;border-radius:10px;margin:8px 0}
+.muted{color:#888;font-size:13px}
+.price{font-weight:bold;color:#716044}
+.total{font-size:23px;font-weight:bold}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+hr{border:0;border-top:1px solid #eee;margin:14px 0}
+</style>
+</head>
+<body>
+<header>
+<h1>ANYME</h1>
+<p>POINT OF SALE · MMK</p>
+</header>
+<main>
+<div class="card">
+<div class="row">
+<h2>Dashboard / အရောင်းစာရင်း</h2>
+<span class="muted">Today</span>
+</div>
+<div class="grid">
+<div><div class="muted">Today's Sales</div><div class="total" id="today">0 Ks</div></div>
+<div><div class="muted">Orders</div><div class="total" id="orders">0</div></div>
+</div>
+</div>
+
+<div class="card">
+<h2>Products / ပစ္စည်းထည့်ရန်</h2>
+<input id="pname" placeholder="Product name">
+<div class="grid">
+<input id="psize" placeholder="Size">
+<input id="pcolor" placeholder="Color">
+</div>
+<div class="grid">
+<input id="pprice" type="number" placeholder="Selling price (Ks)">
+<input id="pstock" type="number" placeholder="Stock quantity">
+</div>
+<button onclick="addProduct()">Add Product</button>
+</div>
+
+<div class="card">
+<h2>Inventory / ပစ္စည်းစာရင်း</h2>
+<div id="products"></div>
+</div>
+
+<div class="card">
+<h2>Checkout / အရောင်း</h2>
+<div id="cart">No items selected.</div>
+<hr>
+<div class="row"><span>Total</span><span class="total" id="total">0 Ks</span></div>
+<label class="muted">Payment Method</label>
+<select id="payment">
+<option value="Cash">Cash</option>
+<option value="KPay">KPay</option>
+<option value="WavePay">WavePay</option>
+<option value="Mixed Payment">Mixed Payment</option>
+</select>
+<div id="mixed" style="display:none">
+<input id="cashPart" type="number" placeholder="Cash amount (Ks)">
+<input id="digitalPart" type="number" placeholder="KPay / WavePay amount (Ks)">
+</div>
+<button style="width:100%" onclick="checkout()">Complete Sale</button>
+</div>
+
+<div class="card">
+<h2>Recent Orders / အရောင်းမှတ်တမ်း</h2>
+<div id="history" class="muted">No orders yet.</div>
+</div>
+</main>
+
+<script>
+let products=JSON.parse(localStorage.getItem("anyme_products")||"[]");
+let cart={};
+let sales=JSON.parse(localStorage.getItem("anyme_sales")||"[]");
+const money=n=>Number(n||0).toLocaleString("en-US")+" Ks";
+function save(){
+ localStorage.setItem("anyme_products",JSON.stringify(products));
+ localStorage.setItem("anyme_sales",JSON.stringify(sales));
+ render();
+}
+function addProduct(){
+ let name=document.getElementById("pname").value.trim();
+ let price=Number(document.getElementById("pprice").value);
+ let stock=Number(document.getElementById("pstock").value);
+ if(!name||price<=0||stock<0){alert("Product name, price and stock ကို မှန်ကန်စွာထည့်ပါ");return}
+ products.push({id:Date.now(),name,size:document.getElementById("psize").value,color:document.getElementById("pcolor").value,price,stock});
+ ["pname","psize","pcolor","pprice","pstock"].forEach(id=>document.getElementById(id).value="");
+ save();
+}
+function addCart(id){
+ let p=products.find(x=>x.id===id);
+ if(!p||p.stock<1){alert("Stock မရှိပါ");return}
+ if((cart[id]||0)>=p.stock){alert("Stock မလုံလောက်ပါ");return}
+ cart[id]=(cart[id]||0)+1;render();
+}
+function changeQty(id,delta){
+ let next=(cart[id]||0)+delta;
+ if(next<=0)delete cart[id];
+ else if(next<=products.find(p=>p.id===id).stock)cart[id]=next;
+ render();
+}
+function render(){
+ document.getElementById("products").innerHTML=products.length?products.map(p=>`
+ <div class="product">
+ <div class="row"><b>${esc(p.name)}</b><span class="price">${money(p.price)}</span></div>
+ <div class="muted">${esc(p.size||"No size")} · ${esc(p.color||"No color")} · Stock: ${p.stock}</div>
+ <button style="margin-top:8px" onclick="addCart(${p.id})" ${p.stock<1?"disabled":""}>Add to cart</button>
+ </div>`).join(""):"No products yet.";
+ let total=0;
+ let entries=Object.entries(cart);
+ document.getElementById("cart").innerHTML=entries.length?entries.map(([id,q])=>{
+ let p=products.find(x=>x.id==id);total+=p.price*q;
+ return `<div class="row product"><div>${esc(p.name)}<div class="muted">${money(p.price)} × ${q}</div></div><div><button class="secondary" onclick="changeQty(${id},-1)">−</button> <button class="secondary" onclick="changeQty(${id},1)">+</button></div></div>`;
+ }).join(""):"No items selected.";
+ document.getElementById("total").textContent=money(total);
+ document.getElementById("today").textContent=money(sales.reduce((s,x)=>s+x.total,0));
+ document.getElementById("orders").textContent=sales.length;
+ document.getElementById("history").innerHTML=sales.length?[...sales].reverse().slice(0,10).map(x=>`<div class="product"><b>${money(x.total)}</b><div class="muted">${esc(x.payment)} · ${new Date(x.date).toLocaleString()}</div></div>`).join(""):"No orders yet.";
+}
+function checkout(){
+ let entries=Object.entries(cart);
+ if(!entries.length){alert("Cart ထဲမှာ ပစ္စည်းမရှိသေးပါ");return}
+ let total=entries.reduce((s,[id,q])=>s+products.find(p=>p.id==id).price*q,0);
+ let method=document.getElementById("payment").value;
+ if(method==="Mixed Payment"){
+  let c=Number(document.getElementById("cashPart").value);
+  let d=Number(document.getElementById("digitalPart").value);
+  if(c<0||d<0||c+d!==total){alert("Cash + Digital amount သည် Total နှင့် တူရပါမယ်");return}
+ }
+ entries.forEach(([id,q])=>products.find(p=>p.id==id).stock-=q);
+ sales.push({total,payment:method,date:new Date().toISOString()});
+ cart={};save();alert("Sale completed!");
+}
+function esc(s){return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
+document.getElementById("payment").addEventListener("change",e=>{
+ document.getElementById("mixed").style.display=e.target.value==="Mixed Payment"?"block":"none";
+});
+render();
+</script>
+</body>
+</html>
+
